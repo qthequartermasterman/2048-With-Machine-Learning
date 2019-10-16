@@ -48,3 +48,34 @@ class TestGameboard(TestCase):
                                                 [4, 0, 0, 4],
                                                 [2, 0, 0, 0],
                                                 [0, 0, 0, 0]]))
+
+    def test_is_board_full(self):
+        # Initialize board
+        self.assertFalse(self.gameboard.is_board_full())
+        # Reinitialize board
+        self.gameboard.board = np.array([[2,   4,  16,   2],
+                                         [4,   2,  64,   4],
+                                         [2,   8,  16,  32],
+                                         [8,  16,  64, 128]])
+        self.assertTrue(self.gameboard.is_board_full())
+
+    def test_check_if_game_over(self):
+        # With initialized board
+        self.assertFalse(self.gameboard.check_if_game_over())
+
+        # With custom boards
+        # Full board with no collapses
+        self.gameboard.board = np.array([[2,   4,  16,   2],
+                                         [4,   2,  64,   4],
+                                         [2,   8,  16,  32],
+                                         [8,  16,  64, 128]])
+        self.assertTrue(self.gameboard.check_if_game_over())
+
+        # Full board with collapses
+        self.gameboard.board = np.array([[2,   4,  16,   2],
+                                         [2,   2,  64,   4],
+                                         [2,   8,  16,  32],
+                                         [8,  16,  64, 128]])
+        self.assertFalse(self.gameboard.check_if_game_over())
+
+

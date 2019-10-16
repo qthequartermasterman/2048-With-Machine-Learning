@@ -1,5 +1,5 @@
 import numpy as np
-
+import math
 
 class Gameboard:
     def __init__(self):
@@ -8,8 +8,10 @@ class Gameboard:
         self.place_random()
         self.place_random()
 
-    def print(self):
+    def print(self, show_score=False):
         print(self.board)
+        if show_score:
+            print('Score: {}'.format(self.calculate_score()))
         print()
 
     # Place a number in a random place on the board. If that random position is already filled, it chooses a different
@@ -105,11 +107,10 @@ class Gameboard:
     def collapse_nothing(self):
         return
 
-
     def is_board_full(self):
         return not (self.boardsize**2 - np.count_nonzero(self.board))
 
-    def move(self, direction):
+    def move(self, direction, show_score=False):
         # parameter direction is a string that says 'up', 'down', 'left', or 'right'
         move_dictionary = {'up': self.collapse_up,
                            'down': self.collapse_down,
@@ -128,30 +129,60 @@ class Gameboard:
 
         # Add a random tile if a move was successful
         if np.array_equal(self.board, temporary_board):
-            self.print()
+            self.print(show_score)
             return 0
         else:
             print('Previous move successful')
         if self.is_board_full():
-            self.print()
+            self.print(show_score)
             print('BOARD FULL')
             return -1
         else:
             self.place_random(self.generate_random_tile())
-            self.print()
+            self.print(show_score)
             return 1
 
     def generate_random_tile(self):
         # Generate a 2, 90% of the time
         return 2 if np.random.random() < 0.9 else 4
 
+    def get_highest_tile(self):
+        return np.max(self.board)
 
+    def get_board_total(self):
+        return np.sum(self.board)
+
+    def get_number_of_active_tiles(self):
+        return np.count_nonzero(self.board)
+
+    def calculate_score(self):
+        return math.pow(self.get_highest_tile(), 2)/self.get_number_of_active_tiles()
+
+    def check_if_game_over(self):
+        if self.is_board_full():
+            print('Board is full.')
+            horizontal_difference = np.diff(self.board)
+            vertical_difference = np.diff(np.transpose(self.board))
+            # print(np.count_nonzero(horizontal_difference))
+            if np.count_nonzero(horizontal_difference) < self.boardsize**2-self.boardsize:
+                # np.diff reduces the number of rows by one.
+                return False
+            elif np.count_nonzero(vertical_difference) < self.boardsize**2-self.boardsize:
+                # np.diff reduces the number of rows by one.
+                return False
+            else:
+                return True
+        else:
+            return False
 
 
 gb = Gameboard()
 gb.print()
+
 for _ in range(0, 1000):
-    if not (gb.move('right') or gb.move('down')):
-        gb.move('left')
+    if gb.check_if_game_over():
+        break
+    if not (gb.move('right', show_score=True) or gb.move('down', show_score=True)):
+        gb.move('left', show_score=True)
 
 
