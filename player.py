@@ -11,7 +11,8 @@ class Player(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        out = self.relu(self.fc1(x))
-        out = self.relu(self.fc2(x))
-        out = self.relu(self.fc3(x))
-
+        out = torch.flatten(x)
+        out = self.relu(self.fc1(out))
+        out = self.relu(self.fc2(out))
+        out = nn.Sigmoid()(self.fc3(out))
+        return out

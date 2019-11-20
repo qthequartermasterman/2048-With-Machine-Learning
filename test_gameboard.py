@@ -49,6 +49,14 @@ class TestGameboard(TestCase):
                                                 [2, 0, 0, 0],
                                                 [0, 0, 0, 0]]))
 
+    def test_is_move_unsuccessful(self):
+        # give it a board that it cannot collapse_right on. If it triggers as successful, fail.
+        self.gameboard.board = np.array([[0, 0, 0, 2],
+                                         [0, 0, 0, 4],
+                                         [0, 0, 4, 2],
+                                         [0, 0, 0, 8]])
+        self.assertEqual(self.gameboard.move('right'), 0)
+
     def test_is_board_full(self):
         # Initialize board
         self.assertFalse(self.gameboard.is_board_full())
