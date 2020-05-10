@@ -6,7 +6,7 @@ class Gameboard:
     def __init__(self):
         self.boardsize = 4  # The size of one side of the board.
         self.board = np.zeros((self.boardsize, self.boardsize), dtype=np.int32)
-        self.board_tensor = torch.zeros((self.boardsize, self.boardsize), dtype=np.int32)
+        self.board_tensor = torch.zeros((self.boardsize, self.boardsize), dtype=torch.int32)
         self.place_random()
         self.place_random()
 
@@ -227,6 +227,24 @@ class Gameboard:
         simulated_board = self.rotate_board(simulated_board, -1 * move_dictionary[direction])  # rotate back
         return simulated_board
 
+    def simulate_move_successful(self, index):
+
+        moves = {
+            0: 'up',
+            1: 'down',
+            2: 'left',
+            3: 'right',
+            4: 'nothing'
+        }
+        temporary_board = np.copy(self.board)
+        direction = moves[index]
+        simulated_board = self.simulate_move(direction)
+        if np.array_equal(self.board, temporary_board):
+            self.print('Simulated move not successful.')
+            return False
+        return True
+
+
     def collapse_nothing(self):
         return
 
@@ -239,7 +257,7 @@ class Gameboard:
 
         # Exit codes:
         # 0: Move not successful (no change in board)
-        # -1: Move successful, board is full
+        # -1: board is full
         # 1: Move successful, tile added
 
         # parameter direction is a string that says 'up', 'down', 'left', or 'right'
@@ -259,6 +277,10 @@ class Gameboard:
         # print(self.board, temporary_board)
 
         # Add a random tile if a move was successful
+        if self.is_board_full():
+            self.print(show_score)
+            print('BOARD FULL')
+            return -1
         if np.array_equal(self.board, temporary_board):
             self.print('Move not successful. Score: {}'.format(show_score))
             return 0
@@ -291,8 +313,7 @@ class Gameboard:
         return np.count_nonzero(self.board)
 
     def calculate_score(self):
-        return math.pow(self.get_highest_tile(), 2)/self.get_number_of_active_tiles()
-
+        return math.log(math.pow(self.get_highest_tile(), 2) / self.get_number_of_active_tiles(), 2)
 
     def check_if_game_over(self):
         if self.is_board_full():
@@ -314,14 +335,44 @@ class Gameboard:
     def get_board_normalized(self):
         board = self.board.astype(np.float32)
         board_tensor = torch.from_numpy(board)
-        return board_tensor / 2048
+        board_tensor = torch.log2(1 + board_tensor)
+        return board_tensor
+
+    def frame_step(self, input_actions):
+        reward = 0.1
+        terminal = False
+
+        moves = {
+            0: 'up',
+            1: 'down',
+            2: 'left',
+            3: 'right',
+            4: 'nothing'
+        }
+
+        action_index = torch.argmax(input_actions).item()
+        result = self.move(moves[action_index])
+
+        if result == -1:
+            terminal = True
+            reward = -1
+            self.__init__()
+        elif result == 0:
+            terminal = False
+            reward = -10
+        elif result == 1:
+            terminal = False
+            reward = self.calculate_score()
+
+        return reward, terminal
 
 
 '''
 gb = Gameboard()
 gb.print()
 
-for _ in range(0, 1000):
+for i in range(0, 1000):
+    print('Step number {}'.format(i))
     if gb.check_if_game_over():
         break
     if not (gb.move('right', show_score=True) or gb.move('down', show_score=True)):
