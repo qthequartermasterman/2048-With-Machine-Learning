@@ -17,9 +17,9 @@ prior_move = -1
 prior_move_successful = True
 
 
-def train(model, start):
+def train(model, start, first_iteration=0):
     gb = gameboard.Gameboard()
-    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = optim.Adam(model.parameters(), lr=3e-6)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     criterion = nn.MSELoss()
 
@@ -32,7 +32,7 @@ def train(model, start):
     state = torch.cat((board_data, board_data, board_data, board_data)).unsqueeze(0)
 
     epsilon = model.initial_epsilon
-    iteration = 0
+    iteration = first_iteration
 
     epsilon_decrements = np.linspace(model.initial_epsilon, model.final_epsilon, model.number_of_iterations)
 
@@ -49,13 +49,16 @@ def train(model, start):
 
         # epsilon greedy exploration
 
-        random_action = random.random() <= epsilon
+        random_action = random.random() <= epsilon or reward < -1
         if random_action:
             print("Performed random action!")
+        if reward < -1:
+            print('Bad first pick!')
 
         action_index = [torch.randint(model.number_of_actions, torch.Size([]), dtype=torch.int)
                         if random_action else torch.argmax(output)][0]
         print('First action index: {}'.format(action_index.item()))
+        '''
         if not gb.simulate_move_successful(action_index.item()):
             # We played something that would not result in a move.
             print('Trying second option')
@@ -63,7 +66,7 @@ def train(model, start):
             action_index = [torch.randint(model.number_of_actions, torch.Size([]), dtype=torch.int)
                             if random_action else torch.argmax(output)][0]
             print('Second action index: {}'.format(action_index.item()))
-
+        '''
         action_index.to(device)
 
         action[action_index] = 1
@@ -126,12 +129,13 @@ def train(model, start):
         state = state_1
         iteration += 1
 
-        if iteration % 25 == 0:
-            torch.save(model, "pretrained_model/current_model_" + str(iteration) + ".pth")
+        if iteration % 1000 == 0:
+            torch.save(model, "pretrained_model/deeper_model_new_training" + str(iteration) + ".pth")
 
         print("iteration:", iteration, "elapsed time:", time.time() - start, "epsilon:", epsilon, "action:",
               action_index.cpu().detach().numpy(), "reward:", reward.numpy()[0][0], "Q max:",
               np.max(output.cpu().detach().numpy()))
+        print('\n\n\n')
 
 
 class GameLoss(nn.Module):
@@ -189,14 +193,20 @@ def main(mode):
             os.mkdir('pretrained_model/')
 
         model = player.Player()
-
+        model.apply(init_weights)
+        '''
+        model = torch.load(
+            'pretrained_model/deeper_model_2000000.pth',
+            map_location='cpu' if not cuda_is_available else None
+        )
+        '''
         if cuda_is_available:  # put on GPU if CUDA is available
             model = model.cuda()
 
-        model.apply(init_weights)
+
         start = time.time()
 
-        train(model, start)
+        train(model, start, 0)
 
 
 if __name__ == "__main__":

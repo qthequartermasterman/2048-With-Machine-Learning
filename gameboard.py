@@ -315,6 +315,7 @@ class Gameboard:
     def calculate_score(self):
         return math.log(math.pow(self.get_highest_tile(), 2) / self.get_number_of_active_tiles(), 2)
 
+
     def check_if_game_over(self):
         if self.is_board_full():
             print('Board is full.')
@@ -332,11 +333,25 @@ class Gameboard:
         else:
             return False
 
+    def get_board(self):
+        board = self.board.astype(np.float32)
+        board_tensor = torch.from_numpy(board)
+        return board_tensor
+
+    def get_board_log(self):
+        board_tensor = self.get_board()
+        board_tensor[board_tensor == 0] = 1
+        board_tensor = torch.log2(board_tensor)
+        return board_tensor
+
     def get_board_normalized(self):
         board = self.board.astype(np.float32)
         board_tensor = torch.from_numpy(board)
-        board_tensor = torch.log2(1 + board_tensor)
-        return board_tensor
+        board_tensor[board_tensor == 0] = 1
+        board_tensor = torch.log2(board_tensor)
+        mean = board_tensor.mean()
+        std = board_tensor.std()
+        return (board_tensor - mean) / std
 
     def frame_step(self, input_actions):
         reward = 0.1
@@ -349,9 +364,22 @@ class Gameboard:
             3: 'right',
             4: 'nothing'
         }
+        board_before_move = self.get_board_log().int().flatten()
+        # tiles_before_move = self.get_number_of_active_tiles()
+        tiles_before_move = torch.bincount(board_before_move, minlength=15)
 
         action_index = torch.argmax(input_actions).item()
         result = self.move(moves[action_index])
+        # tiles_after_move=self.get_number_of_active_tiles()
+        board_after_move = self.get_board_log().int().flatten()
+        tiles_after_move = torch.bincount(board_after_move, minlength=15)
+
+        difference = tiles_after_move - tiles_before_move
+        positive_differences = torch.nn.ReLU()(difference).int()
+        powers_of_two = 2 ** torch.linspace(0, 14, steps=15).int()
+        powers_of_two[powers_of_two == 2] = 0
+        powers_of_two[powers_of_two == 1] = 0
+        # print(positive_differences)
 
         if result == -1:
             terminal = True
@@ -362,7 +390,7 @@ class Gameboard:
             reward = -10
         elif result == 1:
             terminal = False
-            reward = self.calculate_score()
+            reward = torch.matmul(positive_differences, powers_of_two).item()
 
         return reward, terminal
 
