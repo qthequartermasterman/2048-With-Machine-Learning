@@ -17,9 +17,28 @@ prior_move = -1
 prior_move_successful = True
 
 
-def train(model, start, first_iteration=0):
+def write_record(file_path, str):
+    if not os.path.exists(file_path):
+        # os.makedirs(file_path)
+        os.system(r"touch {}".format(file_path))
+    f = open(file_path, 'a')
+    f.write(str)
+    f.close()
+
+
+def adjust_learning_rate(optimizer, epoch, lr):
+    """Sets the learning rate to the initial LR decayed by 10% every 1000 epochs"""
+    lr = lr * (0.9 ** (epoch // 10000))
+    # lr = lr * (0.1 ** (epoch // 20))
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+
+def train(model, start, first_iteration=0, model_name='current_model'):
+    initial_learning_rate = 1e-4
+
     gb = gameboard.Gameboard()
-    optimizer = optim.Adam(model.parameters(), lr=3e-6)
+    optimizer = optim.Adam(model.parameters(), lr=initial_learning_rate)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     criterion = nn.MSELoss()
 
@@ -39,6 +58,10 @@ def train(model, start, first_iteration=0):
     while iteration < model.number_of_iterations:
         # get output from the neural network
         print('ITERATION {} =================='.format(iteration + 1))
+
+        # update learning rate
+        adjust_learning_rate(optimizer, iteration, initial_learning_rate)
+        print('Learning Rate: {}'.format(optimizer.param_groups[0]['lr']))
 
         output = model(state)
         print('Output: {}'.format(output))
@@ -129,13 +152,17 @@ def train(model, start, first_iteration=0):
         state = state_1
         iteration += 1
 
-        if iteration % 1000 == 0:
-            torch.save(model, "pretrained_model/deeper_model_new_training" + str(iteration) + ".pth")
+        if iteration % 5000 == 0:
+            torch.save(model, "pretrained_model/{}".format(model_name) + str(iteration) + ".pth")
+
+        print_string = "iteration: {} \t reward: {} \t Q max: {} \t Max tile: {}\n".format(iteration, reward, np.max(
+            output.cpu().detach().numpy()), gb.get_highest_tile())
 
         print("iteration:", iteration, "elapsed time:", time.time() - start, "epsilon:", epsilon, "action:",
               action_index.cpu().detach().numpy(), "reward:", reward.numpy()[0][0], "Q max:",
               np.max(output.cpu().detach().numpy()))
         print('\n\n\n')
+        write_record("outputs/{}.txt".format(model_name), print_string)
 
 
 class GameLoss(nn.Module):
@@ -176,7 +203,7 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 
-def main(mode):
+def main(mode, model_name):
     cuda_is_available = torch.cuda.is_available()
 
     if mode == 'test':
@@ -193,10 +220,10 @@ def main(mode):
             os.mkdir('pretrained_model/')
 
         model = player.Player()
-        model.apply(init_weights)
+        # model.apply(init_weights)
         '''
         model = torch.load(
-            'pretrained_model/deeper_model_2000000.pth',
+            'pretrained_model/{}_2000000.pth'.format(model_name,
             map_location='cpu' if not cuda_is_available else None
         )
         '''
@@ -206,8 +233,8 @@ def main(mode):
 
         start = time.time()
 
-        train(model, start, 0)
+        train(model, start, 0, model_name)
 
 
 if __name__ == "__main__":
-    main('train')
+    main('train', 'deeper_network_se_blocks')
