@@ -250,11 +250,10 @@ class Gameboard:
         temporary_board = np.copy(self.board)
         direction = moves[index]
         simulated_board = self.simulate_move(direction)
-        if np.array_equal(self.board, temporary_board):
+        if np.array_equal(simulated_board, temporary_board):
             # print('Simulated move not successful.')
             return False
         return True
-
 
     def collapse_nothing(self):
         return
