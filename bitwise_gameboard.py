@@ -194,7 +194,7 @@ class BitwiseGameboard:
         self.board = move_dictionary[direction]()
         if print_board:
             print('Moving in direction {}'.format(direction))
-            self.print(show_score=show_score)
+            # self.print(show_score=show_score)
 
         # Move unsuccessful
         if temporary_board == self.board:

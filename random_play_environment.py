@@ -6,7 +6,7 @@ lost = False
 ai = None
 
 number_of_random_games = 10
-length_of_each_random_game = 10
+length_of_each_random_game = None
 
 iteration = 0
 while not lost:
