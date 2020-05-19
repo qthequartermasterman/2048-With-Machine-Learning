@@ -23,6 +23,9 @@ class Gameboard:
             print('Score: {}'.format(self.score))
         print()
 
+    def np_board(self):
+        return self.board
+
     # Place a number in a random place on the board. If that random position is already filled, it chooses a different
     # position. The default number is 2.
     def place_random(self, number=2):

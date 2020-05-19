@@ -1,6 +1,6 @@
-import gameboard
+import bitwise_gameboard
 
-game = gameboard.Gameboard()
+game = bitwise_gameboard.BitwiseGameboard()
 
 lost = False
 ai = None
