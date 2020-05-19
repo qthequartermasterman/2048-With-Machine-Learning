@@ -8,12 +8,14 @@ import copy
 import math
 import random
 from bitwisetables import *
+from bitwise_helper_functions import *
 
 
 class BitwiseGameboard:
     def __init__(self, starting_array=None, board_size=4):
         self.board_size = board_size  # The size of one side of the board.
         self.score = 0
+        self.scorepenalty = 0  # Our score tables assume we always get random 2, so this will help us weed out random 4
 
         '''Initialize the values on the board'''
         if starting_array is None:
@@ -60,7 +62,7 @@ class BitwiseGameboard:
 
     def print(self, show_score=False):
         board = self.board  # We copy it, since we'll be bit-shifting it like crazy.
-        print('64 bit representation: {}'.format(board))
+        print('64 bit representation: {:16x}'.format(board))
         for i in range(4):
             for j in range(4):
                 power_value = board & 0xf
@@ -192,6 +194,10 @@ class BitwiseGameboard:
 
         # Execute the proper collapse function for the given direction.
         self.board = move_dictionary[direction]()
+
+        # Update score
+        self.score = score_board(self.board) - self.scorepenalty
+
         if print_board:
             print('Moving in direction {}'.format(direction))
             # self.print(show_score=show_score)
@@ -212,7 +218,10 @@ class BitwiseGameboard:
                 return -1
             else:
                 # Add a random tile if a move was successful
-                self.place_random()
+                tile = self.generate_random_tile()
+                if tile == 2:
+                    self.scorepenalty += 4  # If tile==2, then the board gets a new 2^2=4 tile, which means our score_table over counts
+                self.place_random(number=tile)
                 if print_board:
                     self.print(show_score)
                 return 1

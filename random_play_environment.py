@@ -5,8 +5,8 @@ game = bitwise_gameboard.BitwiseGameboard()
 lost = False
 ai = None
 
-number_of_random_games = 10
-length_of_each_random_game = None
+number_of_random_games = 100
+length_of_each_random_game = 10
 
 iteration = 0
 while not lost:
