@@ -62,7 +62,7 @@ class BitwiseGameboard:
 
     def print(self, show_score=False):
         board = self.board  # We copy it, since we'll be bit-shifting it like crazy.
-        print('64 bit representation: {:16x}'.format(board))
+        print('64 bit representation: {}'.format(str(hex(board))))
         for i in range(4):
             for j in range(4):
                 power_value = board & 0xf
