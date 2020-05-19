@@ -9,6 +9,7 @@ import math
 import random
 from bitwisetables import *
 from bitwise_helper_functions import *
+import time
 
 
 class BitwiseGameboard:
@@ -27,7 +28,7 @@ class BitwiseGameboard:
             self.board = self.np_array_to_uint64(starting_array)
 
     def copy(self):
-        return copy.deepcopy(self)
+        return copy.copy(self)
 
     def np_array_to_uint64(self, starting_array):
         """starting_array must be an np_array"""
@@ -193,7 +194,8 @@ class BitwiseGameboard:
         temporary_board = self.board
 
         # Execute the proper collapse function for the given direction.
-        self.board = move_dictionary[direction]()
+        self.board = move_dictionary[direction]() % int(np.uint64(
+            -1) + 1)  # Because python precision is weird, sometimes, the board will be too large. So we can shrink it to keep this faster
 
         # Update score
         self.score = score_board(self.board) - self.scorepenalty
@@ -206,7 +208,6 @@ class BitwiseGameboard:
         if temporary_board == self.board:
             if print_board:
                 self.print()
-            if show_score:
                 print('Move not successful. Score: {}'.format(self.score))
             return 0
         else:
@@ -260,9 +261,9 @@ class BitwiseGameboard:
         if self.is_board_full():
             list_of_moves = ['up', 'down', 'left', 'right']
             for move in list_of_moves:
-                if not self.simulate_move_successful(move):  # If any move is unsuccessful
-                    return True
-            return False  # All moves were successful
+                if self.simulate_move_successful(move):  # If any move is successful, game is not over
+                    return False
+            return True  # All moves were unsuccessful
         else:
             return False
 
