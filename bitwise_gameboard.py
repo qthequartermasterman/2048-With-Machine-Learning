@@ -18,6 +18,8 @@ class BitwiseGameboard:
         self.score = 0
         self.scorepenalty = 0  # Our score tables assume we always get random 2, so this will help us weed out random 4
 
+        self.number_of_actions = 4  # Up, down, left, right
+
         '''Initialize the values on the board'''
         if starting_array is None:
             # 64 bit int, where every 4 bits represents a cell, and every 16 bits represents a row
@@ -30,9 +32,37 @@ class BitwiseGameboard:
     def copy(self):
         return copy.copy(self)
 
+    def set_board(self, board):
+        '''Since there are potentially multiple types of boards floating around, this will determine the type of the input and convert it to a uint64'''
+        if type(board) is int:  # It's already in int form
+            self.board = board
+        elif type(board) is str:
+            self.board = int(board, 16)
+        else:
+            # If it's not then it's a tensor or np array
+            if type(board) is torch.Tensor:
+                board_max_function = torch.max
+                board_min_function = torch.min
+            elif type(board) is np.ndarray:
+                board_max_function = np.max
+                board_min_function = np.min
+            else:
+                print('Unknown board type!')
+                board_max_function = None
+                board_min_function = None
+
+            if board_min_function(board) < 0:  # If there are negative values, then it was normalized
+                print("Normalized board input")
+            else:
+                if board_max_function(board) < 1:
+                    # It is a one_sixteenth_np_array
+                    self.board = self.one_sixteenth_np_array_to_uint64(board)
+                else:
+                    self.board = self.np_array_to_uint64(board)
+
     def np_array_to_uint64(self, starting_array):
         """starting_array must be an np_array"""
-        print('Converting np array to unint64')
+        # print('Converting np array to unint64')
 
         board_tensor = starting_array
         board_tensor[board_tensor == 0] = 1
@@ -45,6 +75,11 @@ class BitwiseGameboard:
                 board |= int(c) << (4 * i)
                 i += 1
         return board
+
+    def one_sixteenth_np_array_to_uint64(self, starting_array):
+        starting_array = 16 * starting_array  # We take the board where everything is in the range [0,1] to the range [0,16] which is log form
+        starting_array = 2 ** starting_array  # Undo the logarithm
+        return self.np_array_to_uint64(starting_array)
 
     def np_board(self, board=None):
         int_board = board if board is not None else self.board
@@ -76,6 +111,19 @@ class BitwiseGameboard:
         if show_score:
             print('Score: {}'.format(self.score))
         print()
+
+    def string_readable(self):
+        board = self.board  # We copy it, since we'll be bit-shifting it like crazy.
+        board_string = ''
+        for i in range(4):
+            for j in range(4):
+                power_value = board & 0xf
+                # Print the power_value, unless it's zero. In which case print 1. Also makes sure to not go to a newline
+                board_string += ('{:6d} '.format(0 if power_value == 0 else 1 << power_value))
+                board >>= 4
+            board_string += '\n'  # Make a new line
+        board_string += '\n'  # Make a new line
+        return board_string
 
     def count_empty(self):
         x = self.board
@@ -160,11 +208,13 @@ class BitwiseGameboard:
         ret ^= row_right_table[(board >> 48) & ROW_MASK] << 48
         return ret
 
-    def rotate_board(self, board, number_of_rotations):
+    def rotate_board(self, board, number_of_rotations=1):
         # number of rotations is in quarter circles, with positive being counter-clockwise
         # returns a copy of the board, but rotated
-        temporary_board = board
-        return temporary_board.rot90(number_of_rotations)
+        self.set_board(board)
+        temporary_board = self.get_board_log_divided_by_16()
+        temp_rotated = temporary_board.rot90(number_of_rotations)
+        return self.one_sixteenth_np_array_to_uint64(temp_rotated)
 
     def collapse_nothing(self):
         return
@@ -227,6 +277,10 @@ class BitwiseGameboard:
                     self.print(show_score)
                 return 1
 
+    def estimate_score(self, board):
+        self.set_board(board)
+        return score_board(self.board)
+
     def simulate_move_successful(self, move):
         move_dictionary = {'up': self.collapse_up,
                            'down': self.collapse_down,
@@ -267,6 +321,37 @@ class BitwiseGameboard:
         else:
             return False
 
+    def check_if_game_won(self):
+        '''
+        Returns True if there is a 2048 tile
+                False if there is not a 2048 tile
+
+        There is probably a faster way using bitwise operations, but instead, we'll just check the hex string of the board for "b" since that represents a 2048 tile.'''
+        board_hex_string = str(hex(self.board))
+        if 'b' in board_hex_string:
+            return True
+        else:
+            return False
+
+    def check_game_status(self):
+        '''Compatible with https://github.com/suragnair/alpha-zero-general/blob/master/Arena.py'''
+        '''returns 0 if game has not ended. 1 if player won, -1 if player lost,
+               small non-zero value for draw.'''
+        if self.check_if_game_won():
+            return 1
+        elif self.check_if_game_over():
+            return -1
+        else:
+            return 0
+
+    def get_valid_moves(self):
+        list_of_moves = ['up', 'down', 'left', 'right']
+        list_of_valid_moves = []
+        for move in list_of_moves:
+            if self.simulate_move_successful(move):  # If any move is successful, game is not over
+                list_of_valid_moves.append(move)
+        return list_of_valid_moves
+
     def get_board(self):
         board = self.np_board().astype(np.float32)
         board_tensor = torch.from_numpy(board)
@@ -283,6 +368,11 @@ class BitwiseGameboard:
         mean = board_tensor.mean()
         std = board_tensor.std()
         return (board_tensor - mean) / std
+
+    def get_board_log_divided_by_16(self):
+        # Every element in the output is in the interval [0,1], but are not adjusted to the mean or std
+        board_tensor = self.get_board_log()
+        return board_tensor / 16
 
     def frame_step(self, input_actions):
         reward = 0.1
@@ -334,10 +424,12 @@ class BitwiseGameboard:
         return self.score
 
     def play_random_game(self, ai=None, length=None):
-        move_dictionary = {0: 'up',
-                           1: 'down',
-                           2: 'left',
-                           3: 'right'}
+        move_dictionary = {
+            0: 'up',
+            1: 'left',
+            2: 'down',
+            3: 'right',
+        }
         if ai is None:
             lost = False
             clone = self.copy()
